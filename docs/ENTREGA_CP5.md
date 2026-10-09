@@ -32,7 +32,7 @@ de custo, build público.
 | Prompts e forma de uso do Nano Banana | P-IMG-01 a 03 | Acrescentados P-IMG-04 (Rafael) e P-IMG-05 (Aurora) | A CP4 listava 3 retratos/cenários para 3 suspeitos e 2 cenários; faltavam dois retratos. As 5 imagens foram geradas no Nano Banana (interface do Gemini, camada gratuita, pois a cota da Gemini API para imagem não estava disponível na conta) e integradas ao jogo. |
 
 ## 4. Checklist de testes manuais
-Preencha "obtido" depois de jogar. Os testes automáticos (`python -m pytest -q`, 32 testes) e o `tests/e2e_play.py` cobrem os itens 1 a 14.
+Preencha "obtido" depois de jogar. Os testes automáticos (`python -m pytest -q`, 36 testes) e o `tests/e2e_play.py` cobrem os itens 1 a 14.
 
 | # | Mecânica | Esperado | Obtido |
 |---|---|---|---|

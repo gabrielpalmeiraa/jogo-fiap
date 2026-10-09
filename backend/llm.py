@@ -188,9 +188,9 @@ def generate_reply(state: GameState, suspect: str, turn: dict, player_message: s
     unlocked = turn["unlocked"]
     client = _client() if allow_api else None
     if not allow_api:
-        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "limite de chamadas GPT por sessão"}
+        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "limite de chamadas GPT por sessão", "api_called": False}
     if client is None:
-        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "sem OPENAI_API_KEY"}
+        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "sem OPENAI_API_KEY", "api_called": False}
     try:
         resp = client.chat.completions.create(
             model=MODEL,
@@ -203,7 +203,7 @@ def generate_reply(state: GameState, suspect: str, turn: dict, player_message: s
             raise ValueError("resposta vazia")
         text, blocked = filter_output(text, suspect, unlocked, player_message)
         if blocked:
-            return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "bloqueado pelo filtro de saída"}
-        return {"text": text, "source": "gpt", "note": MODEL}
+            return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "bloqueado pelo filtro de saída", "api_called": True}
+        return {"text": text, "source": "gpt", "note": MODEL, "api_called": True}
     except Exception as exc:  # rede, quota, chave inválida, timeout
-        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": f"erro da API: {type(exc).__name__}"}
+        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": f"erro da API: {type(exc).__name__}", "api_called": True}

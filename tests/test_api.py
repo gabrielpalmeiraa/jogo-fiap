@@ -72,14 +72,58 @@ def test_limite_de_chamadas_gpt_cai_no_fallback(monkeypatch):
 
 def test_abrir_varias_sessoes_nao_burla_o_teto_por_ip(monkeypatch):
     import main
-    main.GPT_USAGE.clear()
+    import time
+    main.GPT_USAGE.clear(); main.GPT_GLOBAL.clear()
     monkeypatch.setattr(main, "MAX_GPT_CALLS_PER_IP_DAY", 2)
     monkeypatch.setattr(main, "MAX_GPT_CALLS_GLOBAL_DAY", 1000)
-    ip = "testclient"
-    import time
-    main.GPT_USAGE[ip] = [time.time(), time.time()]
+    main.GPT_USAGE["1.2.3.4"] = [time.time(), time.time()]
     sid = c.post("/api/new").json()["sid"]
-    assert main.gpt_allowed(sid, ip) is False
+    assert main.reserve_gpt_call(sid, "1.2.3.4") is False
+
+
+def test_reserva_e_atomica_sob_concorrencia(monkeypatch):
+    import threading
+    import main
+    main.GPT_USAGE.clear(); main.GPT_GLOBAL.clear()
+    monkeypatch.setattr(main, "MAX_GPT_CALLS", 5)
+    sid = c.post("/api/new").json()["sid"]
+    results = []
+    def worker():
+        results.append(main.reserve_gpt_call(sid, "9.9.9.9"))
+    ts = [threading.Thread(target=worker) for _ in range(40)]
+    [t.start() for t in ts]; [t.join() for t in ts]
+    assert sum(results) == 5
+
+
+def test_vaga_devolvida_quando_cai_no_fallback(monkeypatch):
+    import main
+    main.GPT_USAGE.clear(); main.GPT_GLOBAL.clear()
+    sid = c.post("/api/new").json()["sid"]
+    assert main.reserve_gpt_call(sid, "8.8.8.8")
+    main.release_gpt_call(sid, "8.8.8.8")
+    assert main.SESSIONS[sid].gpt_calls == 0 and not main.GPT_GLOBAL
+
+
+def test_x_forwarded_for_so_vale_com_proxy_confiavel(monkeypatch):
+    import main
+    class Req:
+        headers = {"x-forwarded-for": "6.6.6.6, 10.0.0.1"}
+        class client: host = "5.5.5.5"
+    monkeypatch.setattr(main, "TRUST_PROXY", False)
+    assert main.client_ip(Req) == "5.5.5.5"
+    monkeypatch.setattr(main, "TRUST_PROXY", True)
+    assert main.client_ip(Req) == "10.0.0.1"   # última entrada, a do proxy
+
+
+def test_memoria_dos_contadores_e_limitada(monkeypatch):
+    import main
+    import time
+    monkeypatch.setattr(main, "MAX_TRACKED_IPS", 50)
+    log = {}
+    for i in range(500):
+        log[f"ip{i}"] = [time.time()]
+        main._recent(log, f"ip{i}", 3600)
+    assert len(log) <= 50
 
 
 def test_limite_de_partidas_novas_por_ip(monkeypatch):

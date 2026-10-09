@@ -36,12 +36,12 @@ O jogo usa os arquivos que existirem e desenha arte procedural no lugar dos que 
 O projeto já tem `Dockerfile` e `render.yaml`. No Render: New > Blueprint, aponte para o repositório do GitHub e
 preencha `OPENAI_API_KEY` no painel (nunca no código). A URL pública abre direto no menu do jogo.
 Variáveis opcionais: `MAX_GPT_CALLS_PER_SESSION` (padrão 40, depois disso o jogo usa falas pré-escritas),
-`MAX_SESSIONS` (300), `SESSION_TTL_SECONDS` (7200), `MAX_GPT_CALLS_PER_IP_DAY` (120), `MAX_GPT_CALLS_GLOBAL_DAY` (1500) e `MAX_NEW_GAMES_PER_IP_HOUR` (20). Os tetos por IP e global impedem que abrir várias partidas burle o limite por sessão. Perguntas têm no máximo 300 caracteres.
+`MAX_SESSIONS` (300), `SESSION_TTL_SECONDS` (7200), `MAX_GPT_CALLS_PER_IP_DAY` (120), `MAX_GPT_CALLS_GLOBAL_DAY` (1500) e `MAX_NEW_GAMES_PER_IP_HOUR` (20), e `TRUST_PROXY=1` (já definido no Dockerfile, para ler o IP real atrás do proxy do Render). Os tetos por IP e global impedem que abrir várias partidas burle o limite por sessão. Perguntas têm no máximo 300 caracteres.
 No plano gratuito o servidor "dorme" e a primeira abertura pode levar cerca de 1 minuto.
 
 ## Extras implementados
 
-Testes automatizados (`python -m pytest -q`, 32 testes) e partida completa no navegador (`tests/e2e_play.py`, precisa de
+Testes automatizados (`python -m pytest -q`, 36 testes) e partida completa no navegador (`tests/e2e_play.py`, precisa de
 `pip install playwright && playwright install chromium`), fallback quando a API falha, filtro de saída, efeitos sonoros
 (botão de som no canto) e limites de custo. Documentação da entrega em `docs/ENTREGA_CP5.md`; prompts de imagem em
 `docs/prompts_imagens_nano_banana.md`.

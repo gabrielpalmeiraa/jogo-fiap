@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -36,8 +37,12 @@ MAX_GPT_CALLS = int(os.getenv("MAX_GPT_CALLS_PER_SESSION", "40"))  # depois diss
 MAX_GPT_CALLS_PER_IP_DAY = int(os.getenv("MAX_GPT_CALLS_PER_IP_DAY", "120"))
 MAX_GPT_CALLS_GLOBAL_DAY = int(os.getenv("MAX_GPT_CALLS_GLOBAL_DAY", "1500"))
 MAX_NEW_GAMES_PER_IP_HOUR = int(os.getenv("MAX_NEW_GAMES_PER_IP_HOUR", "20"))
+TRUST_PROXY = os.getenv("TRUST_PROXY") == "1"  # só atrás de proxy confiável (Render)
+MAX_TRACKED_IPS = 5000
+LOCK = threading.Lock()
 SID_IP: dict[str, str] = {}
 GPT_USAGE: dict[str, list] = {}   # ip -> timestamps das chamadas ao GPT (últimas 24h)
+GPT_GLOBAL: list = []             # timestamps de todas as chamadas ao GPT (últimas 24h)
 NEW_GAMES: dict[str, list] = {}   # ip -> timestamps de /api/new (última hora)
 
 ASSET_KEYS = {
@@ -85,23 +90,56 @@ def purge_sessions() -> None:
 
 
 def client_ip(request: Request) -> str:
-    fwd = request.headers.get("x-forwarded-for")  # atrás do proxy do Render
-    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "?")
+    """IP do visitante. Atrás do proxy do Render usa a ÚLTIMA entrada do x-forwarded-for
+    (a que o proxy anexou); as anteriores podem ser forjadas pelo cliente."""
+    if TRUST_PROXY:
+        fwd = request.headers.get("x-forwarded-for")
+        if fwd:
+            return fwd.split(",")[-1].strip()
+    return request.client.host if request.client else "?"
 
 
 def _recent(log: dict, key: str, window: float) -> list:
     now = time.time()
-    log[key] = [t for t in log.get(key, []) if now - t < window]
-    return log[key]
+    fresh = [t for t in log.get(key, []) if now - t < window]
+    if fresh:
+        log[key] = fresh
+    else:
+        log.pop(key, None)
+    if len(log) > MAX_TRACKED_IPS:  # limita a memória mesmo com muitos IPs distintos
+        for k in sorted(log, key=lambda k: log[k][-1])[: len(log) - MAX_TRACKED_IPS]:
+            log.pop(k, None)
+    return log.get(key, [])
 
 
-def gpt_allowed(sid: str, ip: str) -> bool:
-    day = 86400
-    if len(_recent(GPT_USAGE, ip, day)) >= MAX_GPT_CALLS_PER_IP_DAY:
-        return False
-    if sum(len(_recent(GPT_USAGE, k, day)) for k in list(GPT_USAGE)) >= MAX_GPT_CALLS_GLOBAL_DAY:
-        return False
-    return SESSIONS[sid].gpt_calls < MAX_GPT_CALLS
+def reserve_gpt_call(sid: str, ip: str) -> bool:
+    """Reserva uma vaga de chamada ao GPT ANTES de chamar (evita corrida entre requisições
+    simultâneas). Se a chamada não usar o GPT, a vaga é devolvida por release_gpt_call."""
+    now = time.time()
+    with LOCK:
+        st = SESSIONS[sid]
+        GPT_GLOBAL[:] = [t for t in GPT_GLOBAL if now - t < 86400]
+        if st.gpt_calls >= MAX_GPT_CALLS:
+            return False
+        if len(_recent(GPT_USAGE, ip, 86400)) >= MAX_GPT_CALLS_PER_IP_DAY:
+            return False
+        if len(GPT_GLOBAL) >= MAX_GPT_CALLS_GLOBAL_DAY:
+            return False
+        st.gpt_calls += 1
+        GPT_USAGE.setdefault(ip, []).append(now)
+        GPT_GLOBAL.append(now)
+        return True
+
+
+def release_gpt_call(sid: str, ip: str) -> None:
+    with LOCK:
+        st = SESSIONS.get(sid)
+        if st and st.gpt_calls > 0:
+            st.gpt_calls -= 1
+        if GPT_USAGE.get(ip):
+            GPT_USAGE[ip].pop()
+        if GPT_GLOBAL:
+            GPT_GLOBAL.pop()
 
 
 def get_state(sid: str) -> GameState:
@@ -140,15 +178,15 @@ def assets():
 @app.post("/api/new")
 def new_game(request: Request):
     ip = client_ip(request)
-    games = _recent(NEW_GAMES, ip, 3600)
-    if len(games) >= MAX_NEW_GAMES_PER_IP_HOUR:
-        raise HTTPException(429, "Muitas partidas novas em pouco tempo. Tente novamente mais tarde.")
-    games.append(time.time())
-    purge_sessions()
-    st = GameState.new()
-    SESSIONS[st.sid] = st
-    LAST_SEEN[st.sid] = time.time()
-    SID_IP[st.sid] = ip
+    with LOCK:
+        if len(_recent(NEW_GAMES, ip, 3600)) >= MAX_NEW_GAMES_PER_IP_HOUR:
+            raise HTTPException(429, "Muitas partidas novas em pouco tempo. Tente novamente mais tarde.")
+        NEW_GAMES.setdefault(ip, []).append(time.time())
+        purge_sessions()
+        st = GameState.new()
+        SESSIONS[st.sid] = st
+        LAST_SEEN[st.sid] = time.time()
+        SID_IP[st.sid] = ip
     return st.public()
 
 
@@ -168,10 +206,16 @@ def collect(body: CollectIn):
 def interrogate(body: InterrogateIn, request: Request):
     st = get_state(body.sid)
     turn = guarded(lambda: st.apply_turn(body.suspect, body.tone, body.evidence_ids, body.message))
-    reply = llm.generate_reply(st, body.suspect, turn, body.message, allow_api=gpt_allowed(body.sid, client_ip(request)))
-    if reply["source"] == "gpt":
-        st.gpt_calls += 1
-        GPT_USAGE.setdefault(client_ip(request), []).append(time.time())
+    ip = client_ip(request)
+    reserved = reserve_gpt_call(body.sid, ip)
+    try:
+        reply = llm.generate_reply(st, body.suspect, turn, body.message, allow_api=reserved)
+    except Exception:
+        if reserved:
+            release_gpt_call(body.sid, ip)
+        raise
+    if reserved and not reply.get("api_called"):
+        release_gpt_call(body.sid, ip)  # nenhuma chamada à API foi feita: devolve a vaga
     st.record_reply(body.suspect, reply["text"])
     return {
         "reply": reply,
