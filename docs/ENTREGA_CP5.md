@@ -5,7 +5,7 @@
 ## 1. README resumido
 Veja `README.md`. Executar: `python -m venv .venv && source .venv/bin/activate`, `pip install -r requirements.txt`,
 `cp .env.example .env` (colocar OPENAI_API_KEY), `python run.py`, abrir http://127.0.0.1:8000.
-Versão pública (build web): [PREENCHER link do Render]. Vídeo: [PREENCHER link].
+Versão pública (build web, jogável sem instalar nada): https://jogo-fiap.onrender.com (a primeira abertura pode levar cerca de 1 minuto, porque o plano gratuito "dorme"). Código: https://github.com/gabrielpalmeiraa/jogo-fiap. Vídeo: [PREENCHER link].
 
 ## 2. Continuidade com a CP4
 Mesmo título, gênero, premissa, elenco, dossiê de evidências e finais da CP4. Mecânicas implementadas (CP4, seção 1.5): interrogatório

@@ -33,6 +33,8 @@ O jogo usa os arquivos que existirem e desenha arte procedural no lugar dos que 
 
 ## Publicar o jogo na web (ponto extra: build público)
 
+Versão publicada: https://jogo-fiap.onrender.com (a primeira abertura pode levar cerca de 1 minuto).
+
 O projeto já tem `Dockerfile` e `render.yaml`. No Render: New > Blueprint, aponte para o repositório do GitHub e
 preencha `OPENAI_API_KEY` no painel (nunca no código). A URL pública abre direto no menu do jogo.
 Variáveis opcionais: `MAX_GPT_CALLS_PER_SESSION` (padrão 40, depois disso o jogo usa falas pré-escritas),
