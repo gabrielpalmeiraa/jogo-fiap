@@ -123,9 +123,14 @@ def _gc(window_by_log: list) -> None:
             log.pop(k, None)
 
 
-def _can_track(log: dict, key: str) -> bool:
-    """Falha fechada: com a tabela cheia, IPs novos não entram (não apagamos o contador de outros IPs)."""
-    return key in log or len(log) < MAX_TRACKED_IPS
+OVERFLOW = "__overflow__"
+
+
+def _bucket(log: dict, key: str) -> str:
+    """Com a tabela cheia, IPs novos dividem um único balde compartilhado (com os mesmos tetos).
+    Assim a tabela nunca passa do limite, os contadores dos outros IPs ficam intactos e quem
+    chega depois ainda joga, só que dividindo a cota do balde (sem bloqueio total)."""
+    return key if key in log or len(log) < MAX_TRACKED_IPS else OVERFLOW
 
 
 def reserve_gpt_call(sid: str, ip: str) -> bool:
@@ -138,7 +143,8 @@ def reserve_gpt_call(sid: str, ip: str) -> bool:
             return False
         _gc([(GPT_USAGE, 86400), (NEW_GAMES, 3600)])
         GPT_GLOBAL[:] = [t for t in GPT_GLOBAL if now - t < 86400]
-        if st.gpt_calls >= MAX_GPT_CALLS or not _can_track(GPT_USAGE, ip):
+        ip = _bucket(GPT_USAGE, ip)
+        if st.gpt_calls >= MAX_GPT_CALLS:
             return False
         if len(_recent(GPT_USAGE, ip, 86400)) >= MAX_GPT_CALLS_PER_IP_DAY:
             return False
@@ -152,6 +158,8 @@ def reserve_gpt_call(sid: str, ip: str) -> bool:
 
 def release_gpt_call(sid: str, ip: str) -> None:
     with LOCK:
+        if ip not in GPT_USAGE and OVERFLOW in GPT_USAGE:
+            ip = OVERFLOW
         st = SESSIONS.get(sid)
         if st and st.gpt_calls > 0:
             st.gpt_calls -= 1
@@ -199,7 +207,8 @@ def new_game(request: Request):
     ip = client_ip(request)
     with LOCK:
         _gc([(GPT_USAGE, 86400), (NEW_GAMES, 3600)])
-        if len(_recent(NEW_GAMES, ip, 3600)) >= MAX_NEW_GAMES_PER_IP_HOUR or not _can_track(NEW_GAMES, ip):
+        ip = _bucket(NEW_GAMES, ip)
+        if len(_recent(NEW_GAMES, ip, 3600)) >= MAX_NEW_GAMES_PER_IP_HOUR:
             raise HTTPException(429, "Muitas partidas novas em pouco tempo. Tente novamente mais tarde.")
         NEW_GAMES.setdefault(ip, []).append(time.time())
         purge_sessions()

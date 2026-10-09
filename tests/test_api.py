@@ -115,18 +115,20 @@ def test_x_forwarded_for_so_vale_com_proxy_confiavel(monkeypatch):
     assert main.client_ip(Req) == "10.0.0.1"   # última entrada, a do proxy
 
 
-def test_tabela_cheia_falha_fechada_sem_apagar_outros_ips(monkeypatch):
-    import time
+def test_tabela_cheia_usa_balde_compartilhado_sem_bloqueio_total(monkeypatch):
     import main
     main.GPT_USAGE.clear(); main.GPT_GLOBAL.clear()
     monkeypatch.setattr(main, "MAX_TRACKED_IPS", 3)
+    monkeypatch.setattr(main, "MAX_GPT_CALLS_PER_IP_DAY", 2)
     sid = c.post("/api/new").json()["sid"]
     for ip in ("a", "b", "c"):
         assert main.reserve_gpt_call(sid, ip)
     antes = {k: list(v) for k, v in main.GPT_USAGE.items()}
-    assert main.reserve_gpt_call(sid, "novo") is False      # IP novo, tabela cheia
-    assert main.GPT_USAGE == antes                          # contadores dos outros IPs intactos
-    assert len(main.GPT_USAGE) == 3
+    assert main.reserve_gpt_call(sid, "novo1") is True       # não há lockout: usa o balde de estouro
+    assert all(main.GPT_USAGE[k] == v for k, v in antes.items())   # outros IPs intactos
+    assert len(main.GPT_USAGE) <= 4                          # 3 IPs + o balde
+    assert main.reserve_gpt_call(sid, "novo2") is True
+    assert main.reserve_gpt_call(sid, "novo3") is False      # o balde tem o mesmo teto e é compartilhado
 
 
 def test_sessao_descartada_no_meio_nao_derruba(monkeypatch):
