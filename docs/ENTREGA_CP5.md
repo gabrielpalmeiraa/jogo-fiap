@@ -32,29 +32,33 @@ de custo, build público.
 | Prompts e forma de uso do Nano Banana | P-IMG-01 a 03 | Acrescentados P-IMG-04 (Rafael) e P-IMG-05 (Aurora) | A CP4 listava 3 retratos/cenários para 3 suspeitos e 2 cenários; faltavam dois retratos. As 5 imagens foram geradas no Nano Banana (interface do Gemini, camada gratuita, pois a cota da Gemini API para imagem não estava disponível na conta) e integradas ao jogo. |
 
 ## 4. Checklist de testes manuais
-Preencha "obtido" depois de jogar. Os testes automáticos (`python -m pytest -q`, 38 testes) e o `tests/e2e_play.py` cobrem os itens 1 a 14.
+Executado em 08/10/2026 contra o servidor real, com o GPT (gpt-4o-mini) ligado. Os itens 2 a 18 foram rodados chamando a API do jogo
+passo a passo (o jogador faz as mesmas chamadas pela tela). Os itens 1 e 19 dependem da interface e estão descritos abaixo. Os
+testes automáticos (`python -m pytest -q`, 38 testes) e o `tests/e2e_play.py` (partida completa no Chromium até o final Caso Encerrado) também passaram.
 
 | # | Mecânica | Esperado | Obtido |
 |---|---|---|---|
-| 1 | Menu: Novo Caso | Abre a Cena do Crime no Dia 1 | [PREENCHER] |
-| 2 | Coletar log e e-mail | Evidências aparecem na aba, sem gastar ação | [PREENCHER] |
-| 3 | Mandado antes do Dia 4 | Bloqueado | [PREENCHER] |
-| 4 | Perguntar a Beatriz | Resposta do GPT com rótulo "gerado em tempo real" | [PREENCHER] |
-| 5 | Pressionar | Confiança cai 8, pressão sobe 12 | [PREENCHER] |
-| 6 | Acolher | Confiança sobe 10, pressão cai 4 | [PREENCHER] |
-| 7 | Apresentar evidência | Pressão sobe uma única vez por prova | [PREENCHER] |
-| 8 | Beatriz com pressão >= 80 | Revela Rafael | [PREENCHER] |
-| 9 | Rafael com pressão >= 70 ou citando Beatriz com prova | Confessa e ganha a evidência | [PREENCHER] |
-| 10 | Aurora sem mandado | Recusa | [PREENCHER] |
-| 11 | Aurora com mandado (Dia 4+) | Libera logs | [PREENCHER] |
-| 12 | 4 ações por dia | Na 5ª, pede para encerrar o dia | [PREENCHER] |
-| 13 | Encerrar dia | Dia +1, pressão -10 | [PREENCHER] |
-| 14 | Acusar Rafael com 2 provas fortes | Final Caso Encerrado | [PREENCHER] |
-| 15 | Acusar Rafael com menos provas | Acusação Frágil | [PREENCHER] |
-| 16 | Acusar Beatriz ou Aurora | Investigação Encerrada com Erro | [PREENCHER] |
-| 17 | Dia 7 encerrado sem acusar | Prazo Esgotado (pede confirmação) | [PREENCHER] |
-| 18 | Sem chave ou com a API fora do ar | Fala pré-escrita e aviso na tela | [PREENCHER] |
-| 19 | Botão de som | Liga e desliga os efeitos | [PREENCHER] |
+| 1 | Menu: Novo Caso | Abre a Cena do Crime no Dia 1 | Passou. Novo caso começa no Dia 1 com 4 ações e medidores Beatriz 65/35, Rafael 30/40, Aurora 50/0. O menu e a tela de jogo foram vistos nos prints do teste no navegador (`docs/prints`). |
+| 2 | Coletar log e e-mail | Evidências aparecem na aba, sem gastar ação | Passou. As duas evidências foram coletadas e as ações continuaram em 4. |
+| 3 | Mandado antes do Dia 4 | Bloqueado | Passou. Resposta 400: "Essa evidência ainda não está disponível." No Dia 4 a coleta funcionou. |
+| 4 | Perguntar a Beatriz | Resposta do GPT com rótulo "gerado em tempo real" | Passou. A resposta veio com fonte `gpt` e modelo `gpt-4o-mini`, em personagem, formal e defensiva. |
+| 5 | Pressionar | Confiança cai 8, pressão sobe 12 | Passou. (68, 38) para (60, 50). |
+| 6 | Acolher | Confiança sobe 10, pressão cai 4 | Passou. (60, 50) para (70, 46). |
+| 7 | Apresentar evidência | Pressão sobe uma única vez por prova | Passou. Pressão 35 para 53 (tom +3 e log +15). Na segunda apresentação do mesmo log subiu só 3 (56). |
+| 8 | Beatriz com pressão >= 80 | Revela Rafael | Passou. Com pressão 82 ela liberou o segredo e o GPT respondeu "O nome que você procura é Rafael Advir". |
+| 9 | Rafael com pressão >= 70 ou citando Beatriz com prova | Confessa e ganha a evidência | Passou. Citando Beatriz com o e-mail, Rafael confessou ("Fui eu quem copiou os dados...") e a Confissão entrou nas evidências. |
+| 10 | Aurora sem mandado | Recusa | Passou. Não liberou e pediu a autorização formal. |
+| 11 | Aurora com mandado (Dia 4+) | Libera logs | Passou. Liberou, informou que a cópia partiu da conta de Rafael Advir, e os Logs da Aurora entraram nas evidências. |
+| 12 | 4 ações por dia | Na 5ª, pede para encerrar o dia | Passou. A 5ª pergunta voltou 400: "Sem ações hoje. Encerre o dia para continuar." |
+| 13 | Encerrar dia | Dia +1, pressão -10 | Passou. Três vezes levou ao Dia 4, a pressão do Rafael caiu de 70 para 33 em três dias, e o evento do mandado apareceu. |
+| 14 | Acusar Rafael com 2 provas fortes | Final Caso Encerrado | Passou. Com e-mail, confissão e logs: `caso_encerrado`. |
+| 15 | Acusar Rafael com menos provas | Acusação Frágil | Passou. Com uma prova forte: `acusacao_fragil`. |
+| 16 | Acusar Beatriz ou Aurora | Investigação Encerrada com Erro | Passou. As duas acusações deram `investigacao_erro`. |
+| 17 | Dia 7 encerrado sem acusar | Prazo Esgotado (pede confirmação) | Passou. Encerrar sete dias seguidos deu `prazo_esgotado`. A confirmação na tela do Dia 7 está no código, mas não foi clicada nesta rodada. |
+| 18 | Sem chave ou com a API fora do ar | Fala pré-escrita e aviso na tela | Passou. Sem chave: fonte `fallback`, nota "sem OPENAI_API_KEY". Com chave inválida: fonte `fallback`, nota "erro da API: AuthenticationError". |
+| 19 | Botão de som | Liga e desliga os efeitos | Pendente. O som não pôde ser ouvido nesta rodada. Teste no navegador e preencha. |
+
+Itens a conferir pelo grupo antes de entregar: o 19 (som), a confirmação do Dia 7 na tela e o retrato da Aurora na tela do interrogatório.
 
 ## 5. Diário de Vibe Coding
 Ferramenta: Claude Code (terminal), conduzido por Gabriel Palmeira. Os prompts abaixo são os que foram realmente enviados nesta etapa final do projeto, copiados do histórico da conversa. Os dados sensíveis (chaves de API) foram omitidos como [chave omitida].
