@@ -68,3 +68,25 @@ def test_limite_de_chamadas_gpt_cai_no_fallback(monkeypatch):
     r = c.post("/api/interrogate", json={"sid": sid, "suspect": "aurora", "message": "Oi"}).json()
     assert r["reply"]["source"] == "fallback"
     assert "limite" in r["reply"]["note"]
+
+
+def test_abrir_varias_sessoes_nao_burla_o_teto_por_ip(monkeypatch):
+    import main
+    main.GPT_USAGE.clear()
+    monkeypatch.setattr(main, "MAX_GPT_CALLS_PER_IP_DAY", 2)
+    monkeypatch.setattr(main, "MAX_GPT_CALLS_GLOBAL_DAY", 1000)
+    ip = "testclient"
+    import time
+    main.GPT_USAGE[ip] = [time.time(), time.time()]
+    sid = c.post("/api/new").json()["sid"]
+    assert main.gpt_allowed(sid, ip) is False
+
+
+def test_limite_de_partidas_novas_por_ip(monkeypatch):
+    import main
+    main.NEW_GAMES.clear()
+    monkeypatch.setattr(main, "MAX_NEW_GAMES_PER_IP_HOUR", 2)
+    assert c.post("/api/new").status_code == 200
+    assert c.post("/api/new").status_code == 200
+    assert c.post("/api/new").status_code == 429
+    main.NEW_GAMES.clear()

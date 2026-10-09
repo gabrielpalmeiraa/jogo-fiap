@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fastapi import FastAPI, HTTPException  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
@@ -32,6 +32,13 @@ LAST_SEEN: dict[str, float] = {}
 MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "300"))
 SESSION_TTL = int(os.getenv("SESSION_TTL_SECONDS", "7200"))
 MAX_GPT_CALLS = int(os.getenv("MAX_GPT_CALLS_PER_SESSION", "40"))  # depois disso, falas pré-escritas
+# Tetos que valem mesmo se o visitante abrir várias sessões (evita burlar o limite por sessão).
+MAX_GPT_CALLS_PER_IP_DAY = int(os.getenv("MAX_GPT_CALLS_PER_IP_DAY", "120"))
+MAX_GPT_CALLS_GLOBAL_DAY = int(os.getenv("MAX_GPT_CALLS_GLOBAL_DAY", "1500"))
+MAX_NEW_GAMES_PER_IP_HOUR = int(os.getenv("MAX_NEW_GAMES_PER_IP_HOUR", "20"))
+SID_IP: dict[str, str] = {}
+GPT_USAGE: dict[str, list] = {}   # ip -> timestamps das chamadas ao GPT (últimas 24h)
+NEW_GAMES: dict[str, list] = {}   # ip -> timestamps de /api/new (última hora)
 
 ASSET_KEYS = {
     "bg_menu": "bg_menu",
@@ -69,10 +76,32 @@ def purge_sessions() -> None:
     for sid in [k for k, t in LAST_SEEN.items() if now - t > SESSION_TTL]:
         SESSIONS.pop(sid, None)
         LAST_SEEN.pop(sid, None)
+        SID_IP.pop(sid, None)
     while len(SESSIONS) >= MAX_SESSIONS:
         oldest = min(LAST_SEEN, key=LAST_SEEN.get)
         SESSIONS.pop(oldest, None)
         LAST_SEEN.pop(oldest, None)
+        SID_IP.pop(oldest, None)
+
+
+def client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for")  # atrás do proxy do Render
+    return fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "?")
+
+
+def _recent(log: dict, key: str, window: float) -> list:
+    now = time.time()
+    log[key] = [t for t in log.get(key, []) if now - t < window]
+    return log[key]
+
+
+def gpt_allowed(sid: str, ip: str) -> bool:
+    day = 86400
+    if len(_recent(GPT_USAGE, ip, day)) >= MAX_GPT_CALLS_PER_IP_DAY:
+        return False
+    if sum(len(_recent(GPT_USAGE, k, day)) for k in list(GPT_USAGE)) >= MAX_GPT_CALLS_GLOBAL_DAY:
+        return False
+    return SESSIONS[sid].gpt_calls < MAX_GPT_CALLS
 
 
 def get_state(sid: str) -> GameState:
@@ -109,11 +138,17 @@ def assets():
 
 
 @app.post("/api/new")
-def new_game():
+def new_game(request: Request):
+    ip = client_ip(request)
+    games = _recent(NEW_GAMES, ip, 3600)
+    if len(games) >= MAX_NEW_GAMES_PER_IP_HOUR:
+        raise HTTPException(429, "Muitas partidas novas em pouco tempo. Tente novamente mais tarde.")
+    games.append(time.time())
     purge_sessions()
     st = GameState.new()
     SESSIONS[st.sid] = st
     LAST_SEEN[st.sid] = time.time()
+    SID_IP[st.sid] = ip
     return st.public()
 
 
@@ -130,12 +165,13 @@ def collect(body: CollectIn):
 
 
 @app.post("/api/interrogate")
-def interrogate(body: InterrogateIn):
+def interrogate(body: InterrogateIn, request: Request):
     st = get_state(body.sid)
     turn = guarded(lambda: st.apply_turn(body.suspect, body.tone, body.evidence_ids, body.message))
-    reply = llm.generate_reply(st, body.suspect, turn, body.message, allow_api=st.gpt_calls < MAX_GPT_CALLS)
+    reply = llm.generate_reply(st, body.suspect, turn, body.message, allow_api=gpt_allowed(body.sid, client_ip(request)))
     if reply["source"] == "gpt":
         st.gpt_calls += 1
+        GPT_USAGE.setdefault(client_ip(request), []).append(time.time())
     st.record_reply(body.suspect, reply["text"])
     return {
         "reply": reply,

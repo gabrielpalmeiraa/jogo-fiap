@@ -28,11 +28,11 @@ de custo, build público.
 | Evidência "mandado" | "Autorização/mandado formal" | Nome exibido: "Autorização formal (mandado)" | Apenas padronização do nome. Comportamento igual ao da CP4. |
 | Tecnologia do cliente | Phaser com HUD | Phaser nas cenas e HUD em DOM/HTML sobre o canvas | Texto longo, campo de entrada e rolagem são muito mais simples em DOM do que em Phaser. |
 | Arquitetura do backend | FastAPI com chamadas ao GPT | Igual, com rota separada para cada ação (`/api/collect`, `/api/interrogate` etc.) | Regras ficam em `game.py` (sem rede) para serem testadas sem chamar a API. |
-| Limites de custo | Custo por token citado como risco | Máx. 300 caracteres por pergunta e 40 chamadas ao GPT por sessão (depois, falas pré-escritas) | Necessário para publicar o jogo com chave real sem risco de gasto descontrolado. |
+| Limites de custo | Custo por token citado como risco | Máx. 300 caracteres por pergunta, 40 chamadas ao GPT por sessão, 120 por IP por dia e 1500 no total por dia (depois, falas pré-escritas) | Necessário para publicar o jogo com chave real sem risco de gasto descontrolado. |
 | Prompts e forma de uso do Nano Banana | P-IMG-01 a 03 | Acrescentados P-IMG-04 (Rafael) e P-IMG-05 (Aurora) | A CP4 listava 3 retratos/cenários para 3 suspeitos e 2 cenários; faltavam dois retratos. As 5 imagens foram geradas no Nano Banana (interface do Gemini, camada gratuita, pois a cota da Gemini API para imagem não estava disponível na conta) e integradas ao jogo. |
 
 ## 4. Checklist de testes manuais
-Preencha "obtido" depois de jogar. Os testes automáticos (`python -m pytest -q`, 30 testes) e o `tests/e2e_play.py` cobrem os itens 1 a 14.
+Preencha "obtido" depois de jogar. Os testes automáticos (`python -m pytest -q`, 32 testes) e o `tests/e2e_play.py` cobrem os itens 1 a 14.
 
 | # | Mecânica | Esperado | Obtido |
 |---|---|---|---|
