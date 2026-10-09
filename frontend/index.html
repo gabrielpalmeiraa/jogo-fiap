@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sinapse: Protocolo Silencioso</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="stage">
+    <div id="game"></div>
+
+    <!-- HUD e telas de gameplay (DOM sobre o canvas do Phaser) -->
+    <div id="ui" class="hidden">
+      <div id="banner"></div>
+      <nav id="tabs">
+        <button data-view="scene">CENA DO CRIME</button>
+        <button data-view="suspects">SUSPEITOS</button>
+        <button data-view="interrogation">INTERROGATÓRIO</button>
+        <button data-view="evidence" id="tab-evidence">EVIDÊNCIAS</button>
+        <button data-view="state">ESTADO DO CASO</button>
+      </nav>
+
+      <!-- Cena do crime -->
+      <section id="view-scene" class="view">
+        <h2>Sala de servidores e escritório da NEXORA Tech</h2>
+        <p class="lead">Você chegou à NEXORA às 7h. Os servidores zumbem, o corredor está vazio e alguém tentou apagar rastros. Examine os pontos de interesse e colete o que puder. Coletar não gasta ações.</p>
+        <div id="hotspots"></div>
+      </section>
+
+      <!-- Suspeitos -->
+      <section id="view-suspects" class="view">
+        <h2>Suspeitos internos</h2>
+        <div id="suspect-cards"></div>
+      </section>
+
+      <!-- Interrogatório (tela de gameplay do mockup) -->
+      <section id="view-interrogation" class="view">
+        <aside id="side">
+          <div id="portrait-frame"><img id="portrait" alt="Retrato do suspeito"><span id="portrait-tag"></span></div>
+          <div id="s-name"></div>
+          <div id="s-role"></div>
+          <div class="meter"><label>CONFIANÇA <b id="trust-val"></b></label><div class="bar"><i id="trust-bar" class="green"></i></div></div>
+          <div class="meter"><label>PRESSÃO <b id="press-val"></b></label><div class="bar"><i id="press-bar" class="red"></i></div></div>
+          <div id="ap"></div>
+          <button id="btn-back" class="ghost">← Voltar aos suspeitos</button>
+          <div id="day-box"></div>
+          <button id="btn-endday" class="ghost small">Encerrar dia ▸</button>
+        </aside>
+        <div id="chat-wrap">
+          <div id="chat"></div>
+          <div id="ai-note"></div>
+          <div id="evbar"><span>APRESENTAR EVIDÊNCIA:</span><div id="evchips"></div></div>
+        </div>
+        <div id="inputrow">
+          <div id="tones">
+            <button data-tone="perguntar" class="on">Perguntar</button>
+            <button data-tone="pressionar">Pressionar</button>
+            <button data-tone="acolher">Acolher</button>
+          </div>
+          <input id="msg" type="text" maxlength="280" placeholder="Faça sua pergunta ao suspeito..." autocomplete="off">
+          <button id="btn-send" class="primary">Perguntar</button>
+        </div>
+      </section>
+
+      <!-- Evidências -->
+      <section id="view-evidence" class="view">
+        <h2>Dossiê de evidências</h2>
+        <div id="ev-cards"></div>
+        <button id="btn-to-board-2" class="primary wide">Montar acusação final</button>
+      </section>
+
+      <!-- Estado do caso -->
+      <section id="view-state" class="view">
+        <h2>Estado do caso #0041</h2>
+        <div id="state-body"></div>
+        <div class="row">
+          <button id="btn-endday-2" class="ghost">Encerrar dia ▸</button>
+          <button id="btn-to-board" class="primary">Montar acusação final</button>
+        </div>
+      </section>
+
+      <!-- Quadro de investigação (dedução final) -->
+      <section id="view-board" class="view">
+        <h2 class="center">QUADRO DE INVESTIGAÇÃO: FORMULAR ACUSAÇÃO</h2>
+        <div id="board-cards"></div>
+        <div id="board-panel">
+          <h3>FORMULAR ACUSAÇÃO FINAL</h3>
+          <p class="muted">Selecione o suspeito e anexe as evidências que sustentam o caso.</p>
+          <div class="muted small-label">ACUSAR:</div>
+          <div id="board-suspects"></div>
+          <div class="muted small-label">EVIDÊNCIAS ANEXADAS:</div>
+          <div id="board-evs"></div>
+          <div id="board-action">
+            <button id="btn-close-case" class="primary">ENCERRAR CASO</button>
+            <div class="warn">⚠ Esta ação é irreversível.</div>
+            <div class="muted">O desfecho depende de quem você acusar e das evidências que anexar.</div>
+            <button id="btn-board-back" class="ghost small">← Voltar à investigação</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <button id="mute" title="Ligar/desligar som" aria-label="Ligar ou desligar o som">🔊</button>
+    <div id="toast"></div>
+  </div>
+
+  <script src="/static/vendor/phaser.min.js"></script>
+  <script src="/static/js/art.js"></script>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>
