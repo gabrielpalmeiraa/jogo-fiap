@@ -109,6 +109,21 @@ O build público levantou riscos que um jogo local não tem. Os commits passaram
 | Tabela de IPs crescendo sem limite, e depois apagando IPs antigos | Esgotar memória, ou zerar o limite de outro IP | Limite de 5000 IPs com um balde compartilhado de estouro, sem bloqueio total |
 | Sessão descartada no meio da requisição | Erro 500 no servidor | A reserva trata sessão inexistente sem quebrar |
 
+### 5.5 Análise de engenharia de prompt
+Para cada prompt-chave, registramos a técnica que ele usou, o limite que apareceu na prática e como o escreveríamos hoje. As versões aprimoradas são uma reflexão posterior e **não foram enviadas**; os textos enviados estão na tabela 5.3.
+
+| # | Técnica usada | Limite observado na prática | Como escreveríamos hoje (não enviado) |
+|---|---|---|---|
+| 1 | Contexto persistente: restrições que não podem mudar, critérios de sucesso (rubrica), estado atual, pendências e lições técnicas aprendidas. | Documento longo, que precisa ser mantido atualizado a cada sessão. | Manter o briefing em um arquivo versionado do projeto, em vez de colar a cada sessão. |
+| 2 | Ancoragem na fonte oficial: enviar CP4 e CP5 antes de pedir qualquer mudança. | O pedido não definia o formato da resposta, então a IA escolheu uma lista corrida. | "Compare o jogo com a CP4 e responda em tabela (item, CP4, CP5), sem alterar código." |
+| 3 | Objetivo guiado pela rubrica, com delegação ampla ("atenta TODOS os critérios"). | Escopo aberto: a IA definiu as prioridades e exigiu conferência manual das linhas do Diário de Mudanças. | Listar os extras em ordem de prioridade, proibir mudança de mecânica da CP4 e exigir testes e um resumo do que mudou. |
+| 4 | Pergunta de capacidade com autorização para pedir ação ao usuário ("se precisar rodar algo no terminal, me avisa"), mantendo o humano no controle. | Não previa um plano B. A API respondeu 429 de cota, e só então mudamos para a interface do Gemini. | "Se a API não tiver cota, descreva o caminho manual equivalente e quais arquivos eu devo salvar." |
+| 5 | Reuso dos prompts da CP4 por continuidade, referência de estilo (imagem de apoio) e uma imagem por prompt. | Colar os cinco prompts juntos, com títulos, gerou uma única imagem. | Um prompt por mensagem, sem rótulos, com o retrato de referência anexado desde o início. |
+| 6 | Instrução curta e verificável: configurar e provar com uma chamada real. | A chave foi escrita no chat, o que a expôs. | "Leia a chave da variável de ambiente que eu defini; não a repita na resposta." |
+| 7 | Ancoragem multimodal: capturas de tela da interface real do Render para a IA guiar o passo seguinte. | Não informamos antes que o repositório era privado, o que causou o erro de "repositório não encontrado". | Informar a visibilidade do repositório e o plano desejado já no primeiro pedido. |
+| 8 | Informar o contexto real de uso ("só para o professor mexer") para recalibrar o risco. | Frase curta: a IA teve de assumir o que "mexer" significava. | "O link será usado só pelo professor, sem senha; ajuste o nível de proteção a isso." |
+| 9 | Delegar a execução com evidência: rodar cada item do checklist e registrar o resultado real. | O primeiro script tinha um erro nosso (5ª pergunta no mesmo dia). | Pedir que cada item seja um caso isolado, com partida nova, e que falhas sejam reportadas em vez de corrigidas em silêncio. |
+
 Nota: a construção inicial do jogo (regras, backend, interface, testes) foi feita em conversas anteriores, resumidas no briefing do prompt 1. Se o grupo quiser, pode acrescentar aqui os prompts dessa fase, copiando do histórico.
 
 ### Como o código funciona (texto do grupo)

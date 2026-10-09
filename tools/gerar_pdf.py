@@ -75,10 +75,12 @@ def md_to_flow(md: str, avail: float, skip_h1=True):
                 w = [0.04, 0.24, 0.32, 0.40]
             elif n == 3 and rows[0][0] == "#":
                 w = [0.04, 0.27, 0.69]
-            elif n == 4 and rows[0][0] == "#":
+            elif n == 4 and rows[0][0] == "#" and not rows[0][1].startswith("Técnica"):
                 w = [0.05, 0.22, 0.25, 0.48]
             elif n == 3 and rows[0][0].startswith("Critério"):
                 w = [0.24, 0.5, 0.26]
+            elif n == 4 and rows[0][1].startswith("Técnica"):
+                w = [0.04, 0.3, 0.28, 0.38]
             elif n == 3 and rows[0][0].startswith("Problema"):
                 w = [0.3, 0.27, 0.43]
             else:
