@@ -115,15 +115,32 @@ def test_x_forwarded_for_so_vale_com_proxy_confiavel(monkeypatch):
     assert main.client_ip(Req) == "10.0.0.1"   # última entrada, a do proxy
 
 
-def test_memoria_dos_contadores_e_limitada(monkeypatch):
-    import main
+def test_tabela_cheia_falha_fechada_sem_apagar_outros_ips(monkeypatch):
     import time
-    monkeypatch.setattr(main, "MAX_TRACKED_IPS", 50)
-    log = {}
-    for i in range(500):
-        log[f"ip{i}"] = [time.time()]
-        main._recent(log, f"ip{i}", 3600)
-    assert len(log) <= 50
+    import main
+    main.GPT_USAGE.clear(); main.GPT_GLOBAL.clear()
+    monkeypatch.setattr(main, "MAX_TRACKED_IPS", 3)
+    sid = c.post("/api/new").json()["sid"]
+    for ip in ("a", "b", "c"):
+        assert main.reserve_gpt_call(sid, ip)
+    antes = {k: list(v) for k, v in main.GPT_USAGE.items()}
+    assert main.reserve_gpt_call(sid, "novo") is False      # IP novo, tabela cheia
+    assert main.GPT_USAGE == antes                          # contadores dos outros IPs intactos
+    assert len(main.GPT_USAGE) == 3
+
+
+def test_sessao_descartada_no_meio_nao_derruba(monkeypatch):
+    import main
+    assert main.reserve_gpt_call("sessao-que-nao-existe", "1.1.1.1") is False
+
+
+def test_purge_com_last_seen_vazio_nao_quebra(monkeypatch):
+    import main
+    monkeypatch.setattr(main, "MAX_SESSIONS", 1)
+    sid = c.post("/api/new").json()["sid"]
+    main.LAST_SEEN.clear()
+    main.purge_sessions()
+    assert len(main.SESSIONS) < 1 or sid not in main.SESSIONS
 
 
 def test_limite_de_partidas_novas_por_ip(monkeypatch):

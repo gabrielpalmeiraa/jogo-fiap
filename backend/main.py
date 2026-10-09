@@ -83,7 +83,7 @@ def purge_sessions() -> None:
         LAST_SEEN.pop(sid, None)
         SID_IP.pop(sid, None)
     while len(SESSIONS) >= MAX_SESSIONS:
-        oldest = min(LAST_SEEN, key=LAST_SEEN.get)
+        oldest = min(LAST_SEEN, key=LAST_SEEN.get) if LAST_SEEN else next(iter(SESSIONS))
         SESSIONS.pop(oldest, None)
         LAST_SEEN.pop(oldest, None)
         SID_IP.pop(oldest, None)
@@ -99,6 +99,9 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "?"
 
 
+_last_gc = {"t": 0.0}
+
+
 def _recent(log: dict, key: str, window: float) -> list:
     now = time.time()
     fresh = [t for t in log.get(key, []) if now - t < window]
@@ -106,10 +109,23 @@ def _recent(log: dict, key: str, window: float) -> list:
         log[key] = fresh
     else:
         log.pop(key, None)
-    if len(log) > MAX_TRACKED_IPS:  # limita a memória mesmo com muitos IPs distintos
-        for k in sorted(log, key=lambda k: log[k][-1])[: len(log) - MAX_TRACKED_IPS]:
+    return fresh
+
+
+def _gc(window_by_log: list) -> None:
+    """Varre e remove IPs sem atividade recente (no máximo 1x por minuto, custo O(n) amortizado)."""
+    now = time.time()
+    if now - _last_gc["t"] < 60:
+        return
+    _last_gc["t"] = now
+    for log, window in window_by_log:
+        for k in [k for k, v in log.items() if not v or now - v[-1] >= window]:
             log.pop(k, None)
-    return log.get(key, [])
+
+
+def _can_track(log: dict, key: str) -> bool:
+    """Falha fechada: com a tabela cheia, IPs novos não entram (não apagamos o contador de outros IPs)."""
+    return key in log or len(log) < MAX_TRACKED_IPS
 
 
 def reserve_gpt_call(sid: str, ip: str) -> bool:
@@ -117,9 +133,12 @@ def reserve_gpt_call(sid: str, ip: str) -> bool:
     simultâneas). Se a chamada não usar o GPT, a vaga é devolvida por release_gpt_call."""
     now = time.time()
     with LOCK:
-        st = SESSIONS[sid]
+        st = SESSIONS.get(sid)
+        if st is None:  # sessão descartada pela limpeza no meio da requisição
+            return False
+        _gc([(GPT_USAGE, 86400), (NEW_GAMES, 3600)])
         GPT_GLOBAL[:] = [t for t in GPT_GLOBAL if now - t < 86400]
-        if st.gpt_calls >= MAX_GPT_CALLS:
+        if st.gpt_calls >= MAX_GPT_CALLS or not _can_track(GPT_USAGE, ip):
             return False
         if len(_recent(GPT_USAGE, ip, 86400)) >= MAX_GPT_CALLS_PER_IP_DAY:
             return False
@@ -179,7 +198,8 @@ def assets():
 def new_game(request: Request):
     ip = client_ip(request)
     with LOCK:
-        if len(_recent(NEW_GAMES, ip, 3600)) >= MAX_NEW_GAMES_PER_IP_HOUR:
+        _gc([(GPT_USAGE, 86400), (NEW_GAMES, 3600)])
+        if len(_recent(NEW_GAMES, ip, 3600)) >= MAX_NEW_GAMES_PER_IP_HOUR or not _can_track(NEW_GAMES, ip):
             raise HTTPException(429, "Muitas partidas novas em pouco tempo. Tente novamente mais tarde.")
         NEW_GAMES.setdefault(ip, []).append(time.time())
         purge_sessions()
