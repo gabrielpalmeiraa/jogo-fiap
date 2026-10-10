@@ -67,7 +67,7 @@ No plano gratuito o servidor "dorme" e a primeira abertura pode levar cerca de 1
 
 ## Extras implementados
 
-Testes automatizados (`python -m pytest -q`, 52 testes) e partida completa no navegador (`tests/e2e_play.py`, precisa de
+Testes automatizados (`python -m pytest -q`, 53 testes) e partida completa no navegador (`tests/e2e_play.py`, precisa de
 `pip install playwright && playwright install chromium`), fallback quando a API falha, filtro de saída, efeitos sonoros
 (botão de som no canto) e limites de custo. Documentação da entrega em `docs/ENTREGA_CP5.md`; prompts de imagem em
 `docs/prompts_imagens_nano_banana.md`.

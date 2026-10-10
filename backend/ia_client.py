@@ -8,11 +8,16 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 
 import requests
 
 log = logging.getLogger("uvicorn.error")
 ENDPOINT = "/v1/ia-generativa/texto"
+# A API embutida roda no mesmo servidor: se todas as threads ficassem esperando a própria API,
+# nenhuma sobraria para atendê-las (travamento). Limitar as chamadas simultâneas deixa threads livres.
+MAX_CONCURRENT = int(os.getenv("MAX_CONCURRENT_IA_CALLS", "8"))
+_slots = threading.BoundedSemaphore(MAX_CONCURRENT)
 
 
 class IAError(Exception):
@@ -40,6 +45,8 @@ def generate_text(messages: list[dict], temperature: float, max_tokens: int) -> 
     if not key:
         raise IAError("sem IA_API_KEY", api_called=False)
     url = base_url().rstrip("/") + ENDPOINT
+    if not _slots.acquire(blocking=False):
+        raise IAError("API de IA ocupada, tente de novo", api_called=False)
     try:
         r = requests.post(
             url,
@@ -49,6 +56,8 @@ def generate_text(messages: list[dict], temperature: float, max_tokens: int) -> 
         )
     except requests.RequestException as exc:
         raise IAError(f"API de IA indisponível: {type(exc).__name__}", api_called=False)
+    finally:
+        _slots.release()
     log.info("jogo -> POST %s -> %s", url, r.status_code)
     if r.status_code == 200:
         return r.json()

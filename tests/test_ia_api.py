@@ -114,3 +114,14 @@ def test_jogo_cai_no_fallback_se_a_api_de_ia_estiver_fora(monkeypatch):
     r = c.post("/api/interrogate", json={"sid": sid, "suspect": "aurora", "message": "Oi"}).json()
     assert r["reply"]["source"] == "fallback" and "indisponível" in r["reply"]["note"]
     assert r["state"]["suspects"]["aurora"]  # a partida continua
+
+
+def test_chamadas_simultaneas_de_ia_sao_limitadas(monkeypatch):
+    """Evita esgotar as threads do servidor esperando a própria API: excedente cai no fallback."""
+    import threading
+    monkeypatch.setattr(ia_client, "_slots", threading.BoundedSemaphore(1))
+    ia_client._slots.acquire()  # simula uma chamada em andamento
+    sid = c.post("/api/new").json()["sid"]
+    r = c.post("/api/interrogate", json={"sid": sid, "suspect": "aurora", "message": "Oi"}).json()
+    assert r["reply"]["source"] == "fallback" and "ocupada" in r["reply"]["note"]
+    assert r["reply"]["api_called"] is False

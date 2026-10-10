@@ -58,7 +58,7 @@ r = requests.post(url, json={"messages": messages, "temperature": temperature, "
 ```
 
 ## 4. Testes
-`python -m pytest -q`: 52 testes, 14 deles novos em `tests/test_ia_api.py`: 401/403/503, rota chamando o provider, 502 do serviço externo, 5 entradas inválidas (422), Swagger e esquema de segurança no OpenAPI, CORS (origem permitida e origem bloqueada), o jogo chamando a API de ponta a ponta e o fallback quando a API de IA está fora do ar.
+`python -m pytest -q`: 53 testes, 15 deles novos em `tests/test_ia_api.py`: 401/403/503, rota chamando o provider, 502 do serviço externo, 5 entradas inválidas (422), Swagger e esquema de segurança no OpenAPI, CORS (origem permitida e origem bloqueada), o jogo chamando a API de ponta a ponta o fallback quando a API de IA está fora do ar e o limite de chamadas simultâneas (evita travar o servidor esperando a própria API).
 
 ## 5. Diário de Mudanças (continua valendo o da CP5 de PLN, com este acréscimo)
 | Item alterado | O que estava antes | O que foi implementado | Justificativa técnica |
