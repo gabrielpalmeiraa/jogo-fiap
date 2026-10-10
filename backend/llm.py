@@ -1,7 +1,8 @@
 """Motor de interação por IA generativa (texto): fala dos NPCs via GPT (OpenAI).
 
 - Monta o prompt de sistema com persona + segredo + estado do caso (como na CP4).
-- Chama a API de chat da OpenAI (SDK oficial `openai`).
+- Pede o texto à API do próprio grupo (POST /v1/ia-generativa/texto, via ia_client);
+  quem fala com a OpenAI é só o provider (providers/ia_provider.py).
 - Filtra a saída (fuga de personagem e spoiler antes do limiar).
 - Se não houver chave ou a API falhar, devolve uma fala pré-escrita (fallback) e avisa a interface.
 """
@@ -11,9 +12,10 @@ import os
 import random
 import re
 
+import ia_client
 from game import EVIDENCES, SUSPECTS, GameState, norm
+from providers.ia_provider import MODEL
 
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.65"))
 HISTORY_TURNS = 8  # só as últimas mensagens vão no prompt (controle de custo)
 
@@ -125,17 +127,8 @@ CONFESSION_PATTERN = re.compile(
 )
 
 
-def _client():
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
-        return None
-    from openai import OpenAI
-
-    return OpenAI(api_key=key, timeout=20.0, max_retries=1)
-
-
 def llm_enabled() -> bool:
-    return bool(os.getenv("OPENAI_API_KEY"))
+    return ia_client.is_enabled()
 
 
 def build_system_prompt(state: GameState, suspect: str, unlocked: bool, presented_now: list[str]) -> str:
@@ -186,24 +179,14 @@ def fallback_reply(suspect: str, unlocked: bool) -> str:
 def generate_reply(state: GameState, suspect: str, turn: dict, player_message: str, allow_api: bool = True) -> dict:
     """Retorna {text, source, note}. source: 'gpt' | 'fallback'."""
     unlocked = turn["unlocked"]
-    client = _client() if allow_api else None
     if not allow_api:
         return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "limite de chamadas GPT por sessão", "api_called": False}
-    if client is None:
-        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "sem OPENAI_API_KEY", "api_called": False}
     try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=build_messages(state, suspect, unlocked, turn["presented_now"]),
-            temperature=TEMPERATURE,
-            max_tokens=220,
-        )
-        text = (resp.choices[0].message.content or "").strip()
-        if not text:
-            raise ValueError("resposta vazia")
-        text, blocked = filter_output(text, suspect, unlocked, player_message)
-        if blocked:
-            return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "bloqueado pelo filtro de saída", "api_called": True}
-        return {"text": text, "source": "gpt", "note": MODEL, "api_called": True}
-    except Exception as exc:  # rede, quota, chave inválida, timeout
-        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": f"erro da API: {type(exc).__name__}", "api_called": True}
+        out = ia_client.generate_text(build_messages(state, suspect, unlocked, turn["presented_now"]), TEMPERATURE, 220)
+        text = out["text"]
+    except ia_client.IAError as exc:  # sem chave, API fora do ar, cota, timeout
+        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": exc.note, "api_called": exc.api_called}
+    text, blocked = filter_output(text, suspect, unlocked, player_message)
+    if blocked:
+        return {"text": fallback_reply(suspect, unlocked), "source": "fallback", "note": "bloqueado pelo filtro de saída", "api_called": True}
+    return {"text": text, "source": "gpt", "note": out.get("model", MODEL), "api_called": True, "via": ia_client.ENDPOINT}

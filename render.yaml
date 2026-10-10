@@ -7,6 +7,8 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false   # preencher no painel do Render, nunca no repositório
+      - key: IA_API_KEY
+        generateValue: true   # o Render gera uma chave aleatória; o jogo e a API de IA a leem do mesmo ambiente
       - key: OPENAI_MODEL
         value: gpt-4o-mini
       - key: MAX_GPT_CALLS_PER_SESSION

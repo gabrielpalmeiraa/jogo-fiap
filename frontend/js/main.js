@@ -226,8 +226,8 @@
       S = r.state;
       srcLog[current].push(r.reply.source);
       lastNote[current] = r.reply.source === "gpt"
-        ? `Texto gerado em tempo real pelo GPT (${r.reply.note}).`
-        : `Modo offline: fala pré-escrita (${r.reply.note}). Configure OPENAI_API_KEY para o GPT ao vivo.`;
+        ? `Texto gerado em tempo real pelo GPT (${r.reply.note}), via API do jogo: POST ${r.reply.via}.`
+        : `Modo offline: fala pré-escrita (${r.reply.note}). Configure OPENAI_API_KEY e IA_API_KEY para o GPT ao vivo.`;
       sfx.reply();
       selEv.clear();
       const after = S.suspects[current].pressure;

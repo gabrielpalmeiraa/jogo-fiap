@@ -14,18 +14,34 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
 import llm  # noqa: E402
 from game import GameError, GameState, TONES  # noqa: E402
+from routers import ia_generativa  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 FRONTEND = ROOT / "frontend"
 ASSETS = FRONTEND / "assets"
 
-app = FastAPI(title="Sinapse: Protocolo Silencioso (MVP)")
+app = FastAPI(
+    title="Sinapse: Protocolo Silencioso (MVP)",
+    version="1.1.0",
+    description="API do jogo (/api/*) e API de IA generativa do grupo (/v1/ia-generativa/*, protegida por X-API-Key).",
+)
+# CORS: origens permitidas a chamar a API de IA a partir de um navegador (lista separada por vírgula).
+# O jogo publicado é servido pelo mesmo domínio, então o padrão só libera o ambiente local.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key"],
+)
+app.include_router(ia_generativa.router)
 SESSIONS: dict[str, GameState] = {}
 LAST_SEEN: dict[str, float] = {}
 

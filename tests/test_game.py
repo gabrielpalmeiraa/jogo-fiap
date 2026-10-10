@@ -196,44 +196,28 @@ def test_filtro_barra_fuga_de_personagem():
 
 
 def test_chamada_gpt_simulada(monkeypatch):
-    """Simula a resposta da API para provar o fluxo prompt -> resposta -> filtro."""
+    """Simula a resposta da API do grupo para provar o fluxo prompt -> resposta -> filtro."""
     seen = {}
 
-    class FakeResp:
-        class _C:
-            class _M:
-                content = "Não tenho nada a declarar sobre isso."
+    def fake(messages, temperature, max_tokens):
+        seen.update(messages=messages, temperature=temperature)
+        return {"text": "Não tenho nada a declarar sobre isso.", "model": "fake"}
 
-            message = _M()
-
-        choices = [_C()]
-
-    class FakeClient:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(**kw):
-                    seen.update(kw)
-                    return FakeResp()
-
-    monkeypatch.setattr(llm, "_client", lambda: FakeClient())
+    monkeypatch.setattr(llm.ia_client, "generate_text", fake)
     gs = GameState.new()
     t = turn(gs, "beatriz")
     r = llm.generate_reply(gs, "beatriz", t, "pergunta")
     assert r["source"] == "gpt" and r["text"].startswith("Não tenho")
+    assert r["via"] == "/v1/ia-generativa/texto"
     assert seen["messages"][0]["role"] == "system" and seen["temperature"] == llm.TEMPERATURE
 
 
 def test_erro_da_api_cai_no_fallback(monkeypatch):
-    class Boom:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(**kw):
-                    raise TimeoutError("rede fora")
+    def boom(*a, **kw):
+        raise llm.ia_client.IAError("erro da API: TimeoutError", api_called=True)
 
-    monkeypatch.setattr(llm, "_client", lambda: Boom())
+    monkeypatch.setattr(llm.ia_client, "generate_text", boom)
     gs = GameState.new()
     t = turn(gs, "beatriz")
     r = llm.generate_reply(gs, "beatriz", t, "pergunta")
-    assert r["source"] == "fallback" and "TimeoutError" in r["note"]
+    assert r["source"] == "fallback" and "TimeoutError" in r["note"] and r["api_called"] is True
