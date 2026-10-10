@@ -2,7 +2,7 @@
 
 Repositório (back-end e jogo): https://github.com/gabrielpalmeiraa/jogo-fiap
 Versão publicada: https://jogo-fiap.onrender.com (Swagger em `/docs`)
-Vídeo: [PREENCHER link]
+Vídeo: https://www.youtube.com/watch?v=MQ5MEFfc5eQ
 
 ## 1. O que mudou
 Antes, o servidor do jogo chamava a OpenAI direto em `backend/llm.py`. Agora a modalidade de IA generativa (texto, as falas dos suspeitos) fica atrás de uma API do grupo:
